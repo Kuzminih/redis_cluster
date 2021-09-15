@@ -1,0 +1,53 @@
+MACHINES = {
+  #leader
+  :vm1 => {
+        :box_name => "centos/7",
+        :ip_addr => '10.10.10.11'
+  },
+  #firs vm in cluster 
+  :vm2 => {
+        :box_name => "centos/7",
+        :ip_addr => '10.10.10.12'
+  },
+  #second vm in cluster
+  :vm3 => {
+        :box_name => "centos/7",
+        :ip_addr => '10.10.10.13'
+  }
+}
+
+Vagrant.configure("2") do |config|
+
+	MACHINES.each do |boxname, boxconfig|
+
+		config.vm.define boxname do |box|
+
+			box.vm.box = boxconfig[:box_name]
+			box.vm.host_name = boxname.to_s
+			box.vm.network "private_network", ip: boxconfig[:ip_addr]
+			box.vm.provider :virtualbox do |vb|
+			  vb.customize ["modifyvm", :id, "--memory", "254"]
+		      end
+			box.vm.provision "shell", inline: <<-SHELL
+				mkdir -p ~root/.ssh; cp ~vagrant/.ssh/auth* ~root/.ssh
+				echo 'PubkeyAuthentication yes' >> /etc/ssh/sshd_config
+                        sed -i "/^[^#]*PasswordAuthentication[[:space:]]no/c\PasswordAuthentication yes" /etc/ssh/sshd_config
+                        systemctl reload sshd
+                        SHELL
+                    case boxname.to_s
+                    when "vm1"
+                      box.vm.provision "shell", inline: <<-SHELL
+                        yum install -y epel-release
+                        yum --enablerepo=epel -y install sshpass 
+                        SHELL
+                    end
+                    case boxname.to_s
+                    when "vm2"
+                        box.vm.provision "shell", inline: <<-SHELL
+                        cat /home/vagrant/.ssh/*
+                        ls -lah
+                        SHELL
+                    end
+                end
+	    end
+end
